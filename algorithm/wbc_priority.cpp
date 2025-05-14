@@ -379,7 +379,7 @@ void WBC_priority::computeDdq(Pin_KinDyn& pinKinDynIn) {
   // task definition
   /// -------- walk -------------
   {
-    int id = kin_tasks_walk.getId("static_Contact");
+    int id = kin_tasks_walk.getId("static_Contact");  // 单腿接触任务
     kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(6);
     kin_tasks_walk.taskLib[id].derrX = Eigen::VectorXd::Zero(6);
     kin_tasks_walk.taskLib[id].ddxDes = Eigen::VectorXd::Zero(6);
@@ -390,7 +390,7 @@ void WBC_priority::computeDdq(Pin_KinDyn& pinKinDynIn) {
     kin_tasks_walk.taskLib[id].dJ = dJc;
     kin_tasks_walk.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
 
-    id = kin_tasks_walk.getId("RedundantJoints");
+    id = kin_tasks_walk.getId("RedundantJoints");  // 使冗余关节保持零位
     kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(5);
     kin_tasks_walk.taskLib[id].errX(0) = 0 - q(21);
     kin_tasks_walk.taskLib[id].errX(1) = 0 - q(22);
@@ -432,7 +432,7 @@ void WBC_priority::computeDdq(Pin_KinDyn& pinKinDynIn) {
     kin_tasks_walk.taskLib[id].dJ = taskMap * dJ_base;
     kin_tasks_walk.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
 
-    id = kin_tasks_walk.getId("PxPy");
+    id = kin_tasks_walk.getId("PxPy");  // 浮动基座位置任务，主要用于前进时的位置跟踪
     kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(2);
     kin_tasks_walk.taskLib[id].errX = des_dq.block(0, 0, 2, 1) * timeStep;
     kin_tasks_walk.taskLib[id].derrX = Eigen::VectorXd::Zero(2);
@@ -443,13 +443,14 @@ void WBC_priority::computeDdq(Pin_KinDyn& pinKinDynIn) {
     taskMap = Eigen::MatrixXd::Zero(2, 6);
     taskMap(0, 0) = 1;
     taskMap(1, 1) = 1;
-    kin_tasks_walk.taskLib[id].J = taskMap * J_base;
+    kin_tasks_walk.taskLib[id].J = taskMap * J_base;  // 取J_base的前两行
     kin_tasks_walk.taskLib[id].dJ = taskMap * dJ_base;
     kin_tasks_walk.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
 
-    id = kin_tasks_walk.getId("PosRot");
+    id = kin_tasks_walk.getId("PosRot");  // 浮动基座位置与姿态任务，xyz,rpy，数量6
     kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(6);
     kin_tasks_walk.taskLib[id].errX.block(0, 0, 3, 1) = base_pos_des - q.block(0, 0, 3, 1);
+    // 为了防止过大误差，限制浮动基座位置误差
     if (fabs(kin_tasks_walk.taskLib[id].errX(0)) >= 0.02)
       kin_tasks_walk.taskLib[id].errX(0) = 0.02 * sign(kin_tasks_walk.taskLib[id].errX(0));
     if (fabs(kin_tasks_walk.taskLib[id].errX(1)) >= 0.02)
@@ -458,8 +459,9 @@ void WBC_priority::computeDdq(Pin_KinDyn& pinKinDynIn) {
       kin_tasks_walk.taskLib[id].errX(2) = 0.005;
     }
     desRot = eul2Rot(base_rpy_des(0), base_rpy_des(1), base_rpy_des(2));
-    kin_tasks_walk.taskLib[id].errX.block<3, 1>(3, 0) = diffRot(base_rot, desRot);
-    kin_tasks_walk.taskLib[id].errX(4) -= 0.05 * dq(4);
+    kin_tasks_walk.taskLib[id].errX.block<3, 1>(3, 0) =
+        diffRot(base_rot, desRot);                       // 利用旋转矩阵计算rpy误差
+    kin_tasks_walk.taskLib[id].errX(4) -= 0.05 * dq(4);  // ?
     kin_tasks_walk.taskLib[id].derrX = Eigen::VectorXd::Zero(6);
     // kin_tasks_walk.taskLib[id].derrX = des_dq.block(0, 0, 6, 1) - dq.block(0, 0, 6, 1);
     kin_tasks_walk.taskLib[id].ddxDes = Eigen::VectorXd::Zero(6);
@@ -475,9 +477,10 @@ void WBC_priority::computeDdq(Pin_KinDyn& pinKinDynIn) {
     kin_tasks_walk.taskLib[id].dJ = dJ_base;
     kin_tasks_walk.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
 
-    id = kin_tasks_walk.getId("SwingLeg");
+    id = kin_tasks_walk.getId("SwingLeg");  // 摆动腿轨迹跟踪任务，数量6
     kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(6);
-    kin_tasks_walk.taskLib[id].errX.block<3, 1>(0, 0) = swing_fe_pos_des_W - fe_pos_sw_W;
+    kin_tasks_walk.taskLib[id].errX.block<3, 1>(0, 0) =
+        swing_fe_pos_des_W - fe_pos_sw_W;  // 末端位置误差（世界坐标系）
     desRot = eul2Rot(swing_fe_rpy_des_W(0), swing_fe_rpy_des_W(1), swing_fe_rpy_des_W(2));
     kin_tasks_walk.taskLib[id].errX.block<3, 1>(3, 0) = diffRot(fe_rot_sw_W, desRot);
     kin_tasks_walk.taskLib[id].errX(4) *= 2;
@@ -501,7 +504,8 @@ void WBC_priority::computeDdq(Pin_KinDyn& pinKinDynIn) {
     target_arm_q << 0.475 - 0.75 * r_hip_pitch, -1.12, 1.9, 0.86, -0.356, 0, 0,
         -0.475 + 0.75 * l_hip_pitch, -1.12, -1.9, 0.86, 0.356, 0, 0;
 
-    id = kin_tasks_walk.getId("HandTrackJoints");
+    id = kin_tasks_walk.getId(
+        "HandTrackJoints");  // 手部轨迹跟踪任务, 数量为7*2=14，其实只控制了手臂的第一个关节进行摆动，手臂的其余关节只是固定位置
     kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(14);
     kin_tasks_walk.taskLib[id].errX = target_arm_q - q.block<14, 1>(7, 0);
     kin_tasks_walk.taskLib[id].derrX = Eigen::VectorXd::Zero(14);
@@ -517,7 +521,7 @@ void WBC_priority::computeDdq(Pin_KinDyn& pinKinDynIn) {
 
   /// -------- stand -------------
   {
-    int id = kin_tasks_stand.getId("static_Contact");
+    int id = kin_tasks_stand.getId("static_Contact");  // 接触任务 站立状态为两足接触
     kin_tasks_stand.taskLib[id].errX = Eigen::VectorXd::Zero(12);
     kin_tasks_stand.taskLib[id].derrX = Eigen::VectorXd::Zero(12);
     kin_tasks_stand.taskLib[id].ddxDes = Eigen::VectorXd::Zero(12);

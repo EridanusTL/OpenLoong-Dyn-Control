@@ -214,10 +214,11 @@ int main(int argc, const char** argv) {
             RobotState.q,
             RobotState.wbc_delta_q_final);  // 基于期望速度积分出期望位置（包含浮动基座）
         RobotState.motors_pos_des =
-            eigen2std(pos_des.block(7, 0, model_nv - 6, 1));             // 提取出关节期望位置
-        RobotState.motors_vel_des = eigen2std(RobotState.wbc_dq_final);  // 拿到WBC计算出的期望速度
+            eigen2std(pos_des.block(7, 0, model_nv - 6, 1));  // 提取出关节期望关节位置
+        RobotState.motors_vel_des =
+            eigen2std(RobotState.wbc_dq_final);  // 拿到WBC计算出的期望关节速度
         RobotState.motors_tor_des =
-            eigen2std(RobotState.wbc_tauJointRes);  // 拿到WBC计算出的期望力矩
+            eigen2std(RobotState.wbc_tauJointRes);  // 拿到WBC计算出的期望关节力矩
       }
 
       pvtCtr.dataBusRead(RobotState);  // 基于期望位置、速度、力矩，对机器人进行力位混合控制
